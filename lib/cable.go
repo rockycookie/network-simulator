@@ -1,5 +1,7 @@
 package lib
 
+import "fmt"
+
 type Cable struct {
 	Nics [2]*Nic
 }
@@ -15,12 +17,11 @@ func (c *Cable) TransmitFrame(fromNic *Nic, frame L2Frame) {
 	var toNic *Nic
 	if c.Nics[0] == fromNic {
 		toNic = c.Nics[1]
-	} else if c.Nics[1] == fromNic {
-		toNic = c.Nics[0]
 	} else {
-		// NIC not connected to this cable
-		return
+		toNic = c.Nics[0]
 	}
+
+	fmt.Printf("Cable transmitting frame: SrcMac=%s, DstMac=%s, from NIC=%s, to NIC=%s\n", frame.SrcMac, frame.DstMac, fromNic.ID, toNic.ID)
 
 	// Deliver the frame to the connected NIC's host or switch
 	toNic.ReceiveFrame(frame)

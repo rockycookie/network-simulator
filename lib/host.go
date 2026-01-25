@@ -19,6 +19,12 @@ func (h *Host) ReceiveFrame(frame L2Frame) {
 	fmt.Printf("[%s][Host %s] Received frame: SrcMac=%s, DstMac=%s\n",
 		time.Now().UTC().Format(time.RFC3339), h.Name, frame.SrcMac, frame.DstMac)
 
+	if frame.DstMac != h.Nic.Mac {
+		fmt.Printf("[%s][Host %s] Frame not for this host (DstMac=%s); ignoring.\n",
+			time.Now().UTC().Format(time.RFC3339), h.Name, frame.DstMac)
+		return
+	}
+
 	// If the frame needs a reply, send a reply frame back
 	if frame.NeedReply {
 		replyFrame := L2Frame{

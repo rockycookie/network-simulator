@@ -1,5 +1,7 @@
 package lib
 
+import "fmt"
+
 type Nic struct {
 	ID             string
 	Mac            string
@@ -12,6 +14,8 @@ type Nic struct {
 func (n *Nic) SendFrame(frame L2Frame) {
 	if n.ConnectedCable != nil {
 		n.ConnectedCable.TransmitFrame(n, frame)
+	} else {
+		fmt.Printf("NIC %s is not connected to any cable; cannot send frame", n.ID)
 	}
 }
 

@@ -9,6 +9,8 @@ type Switch struct {
 }
 
 func (s *Switch) ReceiveFrame(frame L2Frame, inboundNic Nic) {
+	fmt.Printf("Switch '%s' received frame: SrcMac=%s, DstMac=%s, on NIC=%s\n", s.Name, frame.SrcMac, frame.DstMac, inboundNic.ID)
+
 	if s.MacAddressTable == nil {
 		s.MacAddressTable = make(map[string]*Nic)
 	}
@@ -26,6 +28,7 @@ func (s *Switch) ReceiveFrame(frame L2Frame, inboundNic Nic) {
 	if found {
 		s.SendFrame(frame, *outboundNic)
 	} else {
+		fmt.Printf("Switch '%s' does not know destination MAC %s; broadcasting frame\n", s.Name, frame.DstMac)
 		s.broadcastFrame(frame, inboundNic)
 	}
 }
@@ -40,10 +43,10 @@ func (s *Switch) broadcastFrame(frame L2Frame, inboundNic Nic) {
 }
 
 func (s *Switch) SendFrame(frame L2Frame, switchNic Nic) {
-	// Log the frame sending action
-	// Example: Sending frame from SrcMac to DstMac via NIC
-	// You may want to adjust the log format as needed
-	fmt.Printf("Switch '%s' sending frame: SrcMac=%s, DstMac=%s, via NIC=%s\n", s.Name, frame.SrcMac, frame.DstMac, switchNic.ID)
+	if switchNic.ConnectedCable != nil {
+		fmt.Printf("Switch '%s' sending frame: SrcMac=%s, DstMac=%s, via NIC=%s\n", s.Name, frame.SrcMac, frame.DstMac, switchNic.ID)
+		switchNic.ConnectedCable.TransmitFrame(&switchNic, frame)
+	}
 }
 
 // isBroadcastMAC returns true if the MAC address is all-F (broadcast)
