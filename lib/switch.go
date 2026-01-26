@@ -52,6 +52,9 @@ func (s *Switch) Run() {
 	}()
 
 	fmt.Printf("[Switch %s] is running with %d NICs\n", s.Name, len(s.Nics))
+	for i, nic := range s.Nics {
+		fmt.Printf("  Nic %d: ID=%s, Mac=%s\n", i+1, nic.ID, nic.Mac)
+	}
 }
 
 func (s *Switch) ReceiveFrame(frame L2Frame, inboundNic Nic) {

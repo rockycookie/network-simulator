@@ -38,7 +38,7 @@ func (h *Host) Run() {
 		}
 	}()
 
-	fmt.Printf("[Host %s] Started running\n", h.Name)
+	fmt.Printf("[Host %s] (Nic=%s, Mac=%s) Started running\n", h.Name, h.Nic.ID, h.Nic.Mac)
 }
 
 func (h *Host) SendFrame(frame L2Frame) {
@@ -65,7 +65,7 @@ func (h *Host) receiveFrame(frame L2Frame) {
 		}
 		h.SendFrame(replyFrame)
 	} else {
-		fmt.Printf("[%s][Host %s] Received NoReply frame (SrcMac=%s, DstMac=%s): %s\n",
+		fmt.Printf("[%s][Host %s] Received no-reply-required frame (SrcMac=%s, DstMac=%s): %s\n",
 			time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, frame.Name)
 	}
 }

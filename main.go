@@ -42,19 +42,6 @@ func main() {
 	cable2.Connect(&host2.Nic, &sw.Nics[1])
 	cable3.Connect(&host3.Nic, &sw.Nics[2])
 
-	fmt.Printf("Switch: %s\n", sw.Name)
-	for i, nic := range sw.Nics {
-		fmt.Printf("  Nic %d: ID=%s, Mac=%s\n", i+1, nic.ID, nic.Mac)
-	}
-
-	fmt.Printf("\nHost connections:\n")
-	fmt.Printf("  %s: Nic=%s, Mac=%s\n", host1.Name, host1.Nic.ID, host1.Nic.Mac)
-	fmt.Printf("  %s: Nic=%s, Mac=%s\n", host2.Name, host2.Nic.ID, host2.Nic.Mac)
-
-	fmt.Printf("\nCables:\n")
-	fmt.Printf("  Cable1: %s <-> %s\n", cable1.Nics[0].ID, cable1.Nics[1].ID)
-	fmt.Printf("  Cable2: %s <-> %s\n", cable2.Nics[0].ID, cable2.Nics[1].ID)
-
 	fmt.Printf("\n*******************************\nStarting frame transmission simulation\n*******************************\n")
 	// Start hosts to process incoming frames
 	host1.Run()
@@ -72,13 +59,13 @@ func main() {
 		Name:      "Greeting",
 		NeedReply: true,
 	}
-	fmt.Printf("\nHost1 sending frame to Host2\n")
+	fmt.Printf("\n*******************************\nHost1 sending requireReply frame '%s' to Host2\n*******************************\n", frame1.Name)
 	host1.Nic.SendFrame(frame1)
 
 	// sleep for 3 seconds for processing
 	time.Sleep(3 * time.Second)
 
-	fmt.Printf("\nSimulation ended.\n")
+	fmt.Printf("\n*******************************\nSimulation ended\n*******************************\n")
 	// Stop all goroutines
 	host1.Stop()
 	host2.Stop()
@@ -89,5 +76,5 @@ func main() {
 	cable3.Stop()
 
 	// wait a moment for goroutines to finish
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 }

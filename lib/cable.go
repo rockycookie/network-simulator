@@ -17,19 +17,16 @@ type Cable struct {
 	quitChan  chan struct{}
 }
 
+func (c *Cable) init() {
+	c.FrameChan = make(chan cableFrameEvent, 20)
+	c.quitChan = make(chan struct{})
+}
+
 func (c *Cable) Connect(nic1 *Nic, nic2 *Nic) {
 	c.Nics[0] = nic1
 	c.Nics[1] = nic2
 	nic1.ConnectedCable = c
 	nic2.ConnectedCable = c
-
-	// Initialize channels if not already
-	if c.FrameChan == nil {
-		c.FrameChan = make(chan cableFrameEvent, 16)
-	}
-	if c.quitChan == nil {
-		c.quitChan = make(chan struct{})
-	}
 }
 
 // TransmitFrame enqueues a frame event to the Cable's FrameChan for async delivery
@@ -39,6 +36,8 @@ func (c *Cable) TransmitFrame(fromNic *Nic, frame L2Frame) {
 
 // Run starts the Cable's goroutine for frame delivery
 func (c *Cable) Run() {
+	c.init()
+
 	go func() {
 		for {
 			select {
@@ -50,6 +49,8 @@ func (c *Cable) Run() {
 			}
 		}
 	}()
+
+	fmt.Printf("Cable between %s <-> %s is connected\n", c.Nics[0].ID, c.Nics[1].ID)
 }
 
 // deliverFrame handles the actual delivery of a frame from one NIC to the other with delay and logging
