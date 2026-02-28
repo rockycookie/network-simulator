@@ -61,7 +61,7 @@ func (c *Cable) deliverFrame(event cableFrameEvent) {
 	} else {
 		toNic = c.Nics[0]
 	}
-	fmt.Printf("Cable transmitting frame: SrcMac=%s, DstMac=%s, from NIC=%s, to NIC=%s with 100ms delay\n", event.frame.SrcMac, event.frame.DstMac, event.fromNic.ID, toNic.ID)
+	// fmt.Printf("Cable transmitting frame: SrcMac=%s, DstMac=%s, from NIC=%s, to NIC=%s with 100ms delay\n", event.frame.SrcMac, event.frame.DstMac, event.fromNic.ID, toNic.ID)
 	time.Sleep(100 * time.Millisecond)
 	toNic.EnqueueFrame(event.frame)
 }
