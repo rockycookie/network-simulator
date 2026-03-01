@@ -125,9 +125,9 @@ func (s *Switch) SendFrame(frame L2Frame, switchNic *Nic) {
 	if frame.ConfigBpdu != nil {
 		if switchNic.ConnectedCable != nil {
 			if EnableStpLogging {
-				fmt.Printf("[%s][Switch %s] Switch sending BPDU via NIC=%s (RootBridgeId=%s, RootPathCost=%d)\n",
+				fmt.Printf("[%s][Switch %s] Switch sending BPDU via NIC=%s (RootSwitchId=%s, RootPathCost=%d)\n",
 					time.Now().UTC().Format(time.RFC3339Nano), s.Name, switchNic.ID,
-					frame.ConfigBpdu.RootBridgeId, frame.ConfigBpdu.RootPathCost)
+					frame.ConfigBpdu.RootSwitchId, frame.ConfigBpdu.RootPathCost)
 			}
 			switchNic.ConnectedCable.TransmitFrame(switchNic, frame)
 		}

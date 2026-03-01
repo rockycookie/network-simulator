@@ -128,7 +128,7 @@ func main() {
 func printSwitchStpInfo(sw *lib.Switch) {
 	fmt.Printf("Switch: %s\n", sw.Name)
 	fmt.Printf("  Bridge ID: %s\n", sw.StpInfo.ID)
-	fmt.Printf("  Root Bridge ID: %s\n", sw.StpInfo.RootBridgeId)
+	fmt.Printf("  Root Switch ID: %s\n", sw.StpInfo.RootSwitchId)
 	fmt.Printf("  Root Path Cost: %d\n", sw.StpInfo.RootPathCost)
 	fmt.Printf("  STP State: %d\n", sw.StpInfo.State)
 	fmt.Printf("  Ports:\n")
