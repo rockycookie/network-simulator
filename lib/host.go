@@ -47,8 +47,10 @@ func (h *Host) SendFrame(frame L2Frame) {
 
 func (h *Host) receiveFrame(frame L2Frame) {
 	if frame.DstMac != h.Nic.Mac {
-		fmt.Printf("[%s][Host %s] Frame (SrcMac=%s, DstMac=%s) not for this host (DstMac=%s); ignoring.\n",
-			time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, h.Nic.Mac)
+		if EnableMacLogging {
+			fmt.Printf("[%s][Host %s] Frame (SrcMac=%s, DstMac=%s) not for this host (DstMac=%s); ignoring.\n",
+				time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, h.Nic.Mac)
+		}
 		return
 	}
 

@@ -9,6 +9,7 @@ type Nic struct {
 	IP             string
 	Switch         *Switch
 	Host           *Host
+	StpInfo        PortStp
 	FrameChan      chan L2Frame
 	quitChan       chan struct{}
 }
@@ -48,7 +49,7 @@ func (n *Nic) Stop() {
 // handleFrame processes a received frame (internal use)
 func (n *Nic) handleFrame(frame L2Frame) {
 	if n.Switch != nil {
-		n.Switch.EnqueueFrame(frame, *n)
+		n.Switch.EnqueueFrame(frame, n)
 	} else if n.Host != nil {
 		n.Host.EnqueueFrame(frame)
 	}

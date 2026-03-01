@@ -1,80 +1,151 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"network-simulator/lib"
 	"time"
 )
 
 func main() {
-	// Specify two hosts
-	host1 := lib.Host{
-		Name: "Host1",
-		Nic:  lib.Nic{ID: "host1-eth0", Mac: "00:11:22:33:44:11"},
-	}
-	host2 := lib.Host{
-		Name: "Host2",
-		Nic:  lib.Nic{ID: "host2-eth0", Mac: "00:11:22:33:44:21"},
-	}
-	host3 := lib.Host{
-		Name: "Host3",
-		Nic:  lib.Nic{ID: "host3-eth0", Mac: "00:11:22:33:44:31"},
-	}
+	// Define and parse command-line flags
+	loggingScope := flag.String("log", "none", "Logging scope: mac, stp, all, or none")
+	flag.Parse()
 
-	// Specify a switch with 4 ports
-	sw := lib.Switch{
-		Name: "MySwitch",
+	// Set the logging scope
+	lib.SetLoggingScope(*loggingScope)
+
+	fmt.Printf("\n===============================================\n")
+	fmt.Printf("   STP ROOT ELECTION DEMONSTRATION\n")
+	fmt.Printf("===============================================\n\n")
+
+	// Create a triangle topology with 3 switches to demonstrate STP
+	// Switch IDs determined by lowest MAC: SW1 < SW2 < SW3
+	// SW1 should become root bridge
+
+	sw1 := lib.Switch{
+		Name: "Switch1",
 		Nics: []lib.Nic{
-			{ID: "sw-eth0", Mac: "00:11:22:33:44:01"},
-			{ID: "sw-eth1", Mac: "00:11:22:33:44:02"},
-			{ID: "sw-eth2", Mac: "00:11:22:33:44:03"},
-			{ID: "sw-eth3", Mac: "00:11:22:33:44:04"},
+			{ID: "sw1-eth0", Mac: "00:00:00:00:01:01"}, // Lowest MAC - will be root
+			{ID: "sw1-eth1", Mac: "00:00:00:00:01:02"},
 		},
 	}
 
-	// Specify cables
-	cable1 := &lib.Cable{}
-	cable2 := &lib.Cable{}
-	cable3 := &lib.Cable{}
-
-	// Connect hosts to switch via cables
-	cable1.Connect(&host1.Nic, &sw.Nics[0])
-	cable2.Connect(&host2.Nic, &sw.Nics[1])
-	cable3.Connect(&host3.Nic, &sw.Nics[2])
-
-	fmt.Printf("\n*******************************\nStarting frame transmission simulation\n*******************************\n")
-	// Start hosts to process incoming frames
-	host1.Run()
-	host2.Run()
-	host3.Run()
-	sw.Run()
-	cable1.Run()
-	cable2.Run()
-	cable3.Run()
-
-	// Host1 sends a frame to Host2
-	frame1 := lib.L2Frame{
-		SrcMac:    host1.Nic.Mac,
-		DstMac:    host2.Nic.Mac,
-		Name:      "Greeting",
-		NeedReply: true,
+	sw2 := lib.Switch{
+		Name: "Switch2",
+		Nics: []lib.Nic{
+			{ID: "sw2-eth0", Mac: "00:00:00:00:02:01"},
+			{ID: "sw2-eth1", Mac: "00:00:00:00:02:02"},
+		},
 	}
-	fmt.Printf("\n*******************************\nHost1 sending requireReply frame '%s' to Host2\n*******************************\n", frame1.Name)
-	host1.Nic.SendFrame(frame1)
 
-	// sleep for 3 seconds for processing
-	time.Sleep(3 * time.Second)
+	sw3 := lib.Switch{
+		Name: "Switch3",
+		Nics: []lib.Nic{
+			{ID: "sw3-eth0", Mac: "00:00:00:00:03:01"},
+			{ID: "sw3-eth1", Mac: "00:00:00:00:03:02"},
+			{ID: "sw3-eth2", Mac: "00:00:00:00:03:03"},
+		},
+	}
 
-	fmt.Printf("\n*******************************\nSimulation ended\n*******************************\n")
+	sw4 := lib.Switch{
+		Name: "Switch4",
+		Nics: []lib.Nic{
+			{ID: "sw4-eth0", Mac: "00:00:00:00:04:01"}, // Highest MAC
+		},
+	}
+
+	// Create cables for triangle topology
+	// SW1 <-> SW2
+	cableSW1SW2 := &lib.Cable{}
+	cableSW1SW2.Connect(&sw1.Nics[0], &sw2.Nics[0])
+
+	// SW2 <-> SW3
+	cableSW2SW3 := &lib.Cable{}
+	cableSW2SW3.Connect(&sw2.Nics[1], &sw3.Nics[0])
+
+	// SW3 <-> SW1
+	cableSW1SW3 := &lib.Cable{}
+	cableSW1SW3.Connect(&sw1.Nics[1], &sw3.Nics[1])
+
+	// SW4 <-> SW3
+	cableSW3SW4 := &lib.Cable{}
+	cableSW3SW4.Connect(&sw3.Nics[2], &sw4.Nics[0])
+
+	// Start all devices
+	fmt.Printf("Starting all devices...\n")
+	sw1.Run()
+	sw2.Run()
+	sw3.Run()
+	sw4.Run()
+	cableSW1SW2.Run()
+	cableSW2SW3.Run()
+	cableSW1SW3.Run()
+	cableSW3SW4.Run()
+
+	fmt.Printf("\n===============================================\n")
+	fmt.Printf("   STARTING STP ROOT ELECTION\n")
+	fmt.Printf("===============================================\n\n")
+
+	// Start STP on all switches
+	sw1.RunStp()
+	sw2.RunStp()
+	sw3.RunStp()
+	sw4.RunStp()
+
+	// Wait for STP convergence (ForwardDelay + some buffer)
+	fmt.Printf("Waiting for STP convergence (16 seconds)...\n\n")
+	time.Sleep(16 * time.Second)
+
+	// Display STP results
+	fmt.Printf("\n===============================================\n")
+	fmt.Printf("   STP CONVERGENCE RESULTS\n")
+	fmt.Printf("===============================================\n\n")
+
+	printSwitchStpInfo(&sw1)
+	printSwitchStpInfo(&sw2)
+	printSwitchStpInfo(&sw3)
+	printSwitchStpInfo(&sw4)
+
+	fmt.Printf("\n===============================================\n")
+	fmt.Printf("   SIMULATION COMPLETE\n")
+	fmt.Printf("===============================================\n\n")
+
 	// Stop all goroutines
-	host1.Stop()
-	host2.Stop()
-	host3.Stop()
-	sw.Stop()
-	cable1.Stop()
-	cable2.Stop()
-	cable3.Stop()
+	sw1.Stop()
+	sw2.Stop()
+	sw3.Stop()
+	sw4.Stop()
+	cableSW1SW2.Stop()
+	cableSW2SW3.Stop()
+	cableSW1SW3.Stop()
+	cableSW3SW4.Stop()
 
-	// wait a moment for goroutines to finish
-	time.Sleep(2 * time.Second)
+	// Wait for cleanup
+	time.Sleep(1 * time.Second)
+}
+
+func printSwitchStpInfo(sw *lib.Switch) {
+	fmt.Printf("Switch: %s\n", sw.Name)
+	fmt.Printf("  Bridge ID: %s\n", sw.StpInfo.ID)
+	fmt.Printf("  Root Bridge ID: %s\n", sw.StpInfo.RootBridgeId)
+	fmt.Printf("  Root Path Cost: %d\n", sw.StpInfo.RootPathCost)
+	fmt.Printf("  STP State: %d\n", sw.StpInfo.State)
+	fmt.Printf("  Ports:\n")
+	for i := range sw.Nics {
+		nic := &sw.Nics[i]
+		portType := "UNKNOWN"
+		switch nic.StpInfo.Type {
+		case lib.PORT_STP_TYPE_ROOT:
+			portType = "ROOT"
+		case lib.PORT_STP_TYPE_DESIGNATED:
+			portType = "DESIGNATED"
+		case lib.PORT_STP_TYPE_BLOCKING:
+			portType = "BLOCKING"
+		}
+		fmt.Printf("    Port %d (%s):\n", i, nic.ID)
+		fmt.Printf("      Role: %s\n", portType)
+		fmt.Printf("      Root Path Cost: %d\n", nic.StpInfo.RootPathCost)
+	}
+	fmt.Printf("\n")
 }
