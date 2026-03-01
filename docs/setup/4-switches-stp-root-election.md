@@ -14,7 +14,7 @@ So that after the timeout (15 seconds), all switches know
 ## Execution console output
 Notes:
 - eventual roles of all ports stay as `BLOCKING` as the relevant feature is not implemented yet
-- switch 3 port to switch 4 has cost of 4 which is a bit counter-intuitive, but acceptable
+- Switch3's port to Switch4 has cost of 3 which is a bit counter-intuitive, but acceptable
 
 ```bash
 % ./network-simulator -log stp
