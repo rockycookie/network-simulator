@@ -11,33 +11,18 @@ type SwitchStp struct {
 	HelloTimeSeconds    uint16
 	ForwardDelaySeconds uint16
 	State               uint8
-	RootBridgeId        string
+	RootSwitchId        string
 	RootPathCost        uint32
 	mu                  sync.Mutex
 }
 
-type PortStp struct {
-	Type         uint8
-	LinkCost     uint32
-	RootBridgeId string
-	RootPathCost uint32
-	mu           sync.Mutex
-}
-
 const (
-	PORT_STP_TYPE_ROOT       = 0
-	PORT_STP_TYPE_DESIGNATED = 1
-	PORT_STP_TYPE_BLOCKING   = 2
-
 	SW_STP_STATE_DISABLED   = 0
 	SW_STP_STATE_BLOCKING   = 1
 	SW_STP_STATE_LISTENING  = 2
 	SW_STP_STATE_LEARNING   = 3
 	SW_STP_STATE_FORWARDING = 4
 	SW_STP_STATE_BROKEN     = 5
-
-	// The standard destination MAC address for Bridge Protocol Data Units (BPDUs) in STP/RSTP is the IEEE 802.1D multicast address 01:80:C2:00:00:00
-	STP_BPDU_DEST_MAC = "01:80:C2:00:00:00"
 )
 
 func (sw *Switch) initStp() {
@@ -46,7 +31,7 @@ func (sw *Switch) initStp() {
 		HelloTimeSeconds:    2,
 		ForwardDelaySeconds: 15,
 		State:               SW_STP_STATE_DISABLED,
-		RootBridgeId:        "",
+		RootSwitchId:        "",
 		RootPathCost:        0,
 	}
 
@@ -62,7 +47,7 @@ func (sw *Switch) initStp() {
 		sw.Nics[i].StpInfo = PortStp{
 			Type:         PORT_STP_TYPE_BLOCKING,
 			LinkCost:     1,             // default link cost, simplified version
-			RootBridgeId: sw.StpInfo.ID, // initially assume we are the root
+			RootSwitchId: sw.StpInfo.ID, // initially assume we are the root
 			RootPathCost: 0,             // no cost to reach ourselves
 		}
 	}
@@ -87,9 +72,9 @@ func (sw *Switch) RunStp() {
 		// Wait for ForwardDelaySeconds before transitioning ports to forwarding state
 		time.Sleep(time.Duration(sw.StpInfo.ForwardDelaySeconds) * time.Second)
 
-		// Finished root election
-		//TODO: continue more later
-		sw.StpInfo.State = SW_STP_STATE_BROKEN // temporary state to indicate STP is done
+		// Finished root election, let's treat listening and learning as the same state for now
+		sw.updatePortsStateAfterRootElection()
+		sw.StpInfo.State = SW_STP_STATE_FORWARDING
 	}()
 }
 
@@ -101,8 +86,9 @@ func (nic *Nic) sendConfigBpdu(helloTimeSeconds uint16) {
 
 		bpdu := L2Frame{
 			ConfigBpdu: &ConfigBpdu{
-				RootBridgeId: nic.Switch.StpInfo.RootBridgeId,
-				RootPathCost: nic.Switch.StpInfo.RootPathCost,
+				RootSwitchId:  nic.Switch.StpInfo.RootSwitchId,
+				RootPathCost:  nic.Switch.StpInfo.RootPathCost,
+				LocalSwitchId: nic.Switch.StpInfo.ID,
 			},
 			SrcMac: nic.Mac,
 			DstMac: STP_BPDU_DEST_MAC,
@@ -111,12 +97,6 @@ func (nic *Nic) sendConfigBpdu(helloTimeSeconds uint16) {
 		// Send BPDU out of each non-blocking port
 		if nic.ConnectedCable != nil {
 			nic.ConnectedCable.TransmitFrame(nic, bpdu)
-		}
-
-		if EnableStpLogging {
-			fmt.Printf("[%s][Switch %s] Sending BPDU on NIC %s: RootBridgeId=%s, RootPathCost=%d\n",
-				time.Now().UTC().Format(time.RFC3339Nano), nic.Switch.Name, nic.ID,
-				nic.Switch.StpInfo.RootBridgeId, nic.Switch.StpInfo.RootPathCost)
 		}
 
 		// Sleep for the hello interval
@@ -128,46 +108,56 @@ func (sw *Switch) ProcessConfigBpdu(inboundBPDU *ConfigBpdu, inboundNic *Nic) {
 
 	if inboundNic.Switch.StpInfo.State == SW_STP_STATE_LISTENING {
 
-		// Update root bridge info if we receive a better root
-		if inboundBPDU.RootBridgeId < inboundNic.StpInfo.RootBridgeId {
+		// Update root switch info if we receive a better root
+		if inboundBPDU.RootSwitchId < inboundNic.StpInfo.RootSwitchId {
 			inboundCost := inboundBPDU.RootPathCost + inboundNic.StpInfo.LinkCost
-			inboundRootId := inboundBPDU.RootBridgeId
+			inboundRootId := inboundBPDU.RootSwitchId
 
 			if EnableStpLogging {
-				fmt.Printf("[%s][Switch %s] Received better BPDU on NIC %s: RootBridgeId=%s, RootPathCost=%d (was RootBridgeId=%s, RootPathCost=%d)\n",
+				fmt.Printf("[%s][%s:%s] Received BPDU with lower-Root-ID: RootSwitchId=%s, RootPathCost=%d (was RootBridgeId=%s, RootPathCost=%d)\n",
 					time.Now().UTC().Format(time.RFC3339Nano), sw.Name, inboundNic.ID,
-					inboundRootId, inboundCost, inboundNic.StpInfo.RootBridgeId, inboundNic.StpInfo.RootPathCost)
+					inboundRootId, inboundCost, inboundNic.StpInfo.RootSwitchId, inboundNic.StpInfo.RootPathCost)
 			}
 
 			// write the better root info to the inbound port's STP info
 			inboundNic.swLock()
-			inboundNic.StpInfo.RootBridgeId = inboundRootId
+			inboundNic.StpInfo.RootSwitchId = inboundRootId
 			inboundNic.StpInfo.RootPathCost = inboundCost
 			inboundNic.swUnlock()
+		} else {
+
+			// otherwise just do logging
+			if EnableStpLogging {
+				fmt.Printf("[%s][%s:%s] Received BPDU: RootSwitchId=%s, RootPathCost=%d, LocalSwitchId=%s\n",
+					time.Now().UTC().Format(time.RFC3339Nano), sw.Name, inboundNic.ID,
+					inboundBPDU.RootSwitchId, inboundBPDU.RootPathCost, inboundBPDU.LocalSwitchId)
+			}
 		}
+
+		// Always update the other switch info
+		inboundNic.swLock()
+		inboundNic.StpInfo.OtherSwitchId = inboundBPDU.LocalSwitchId
+		inboundNic.StpInfo.OtherSwitchRootPathCost = inboundBPDU.RootPathCost
+		inboundNic.swUnlock()
 	}
 }
 
-func (sw *Switch) calculateRootBridgeIdAndCostAndPortIndex() (string, uint32, int) {
+func (sw *Switch) calculateRootSwitchIdAndCostAndPortIndex() (string, uint32, int) {
 	var rootId string = ""
 	var cost uint32 = 0
 	var portIndex int = -1
 
 	sw.StpInfo.mu.Lock()
 	for i := range sw.Nics {
-		if rootId == "" || (sw.Nics[i].StpInfo.RootBridgeId != "" && sw.Nics[i].StpInfo.RootBridgeId <= rootId) {
+		if rootId == "" || (sw.Nics[i].StpInfo.RootSwitchId != "" && sw.Nics[i].StpInfo.RootSwitchId <= rootId) {
 
 			// If there are multiple paths to the same root, choose the one with the lowest cost
-			if sw.Nics[i].StpInfo.RootBridgeId == rootId {
-				if sw.Nics[i].StpInfo.RootPathCost < cost {
-					cost = sw.Nics[i].StpInfo.RootPathCost
-					portIndex = i
-					continue
-				}
+			if sw.Nics[i].StpInfo.RootSwitchId == rootId && sw.Nics[i].StpInfo.RootPathCost > cost {
+				continue
 			}
 
 			// update rootId, cost, and portIndex if this port has a better root path
-			rootId = sw.Nics[i].StpInfo.RootBridgeId
+			rootId = sw.Nics[i].StpInfo.RootSwitchId
 			cost = sw.Nics[i].StpInfo.RootPathCost
 			portIndex = i
 		}
@@ -179,10 +169,56 @@ func (sw *Switch) calculateRootBridgeIdAndCostAndPortIndex() (string, uint32, in
 }
 
 func (sw *Switch) syncPortsSTP() {
-	rootId, cost, _ := sw.calculateRootBridgeIdAndCostAndPortIndex()
+	rootId, cost, _ := sw.calculateRootSwitchIdAndCostAndPortIndex()
 
 	sw.StpInfo.mu.Lock()
-	sw.StpInfo.RootBridgeId = rootId
+	sw.StpInfo.RootSwitchId = rootId
 	sw.StpInfo.RootPathCost = cost
 	sw.StpInfo.mu.Unlock()
+}
+
+func (sw *Switch) updatePortsStateAfterRootElection() {
+
+	if sw.StpInfo.RootSwitchId == sw.StpInfo.ID {
+		// All ports are designated ports for STP root
+		for i := range sw.Nics {
+			sw.Nics[i].StpInfo.Type = PORT_STP_TYPE_DESIGNATED
+		}
+
+		if EnableStpLogging {
+			fmt.Printf("[%s][%s] ------> I am the root switch, all ports set to DESIGNATED.\n", time.Now().UTC().Format(time.RFC3339Nano), sw.Name)
+		}
+	} else {
+		_, localRootPathCost, rootPortIndex := sw.calculateRootSwitchIdAndCostAndPortIndex()
+
+		for i := range sw.Nics {
+			if sw.Nics[i].StpInfo.RootSwitchId == "" {
+				continue
+			} else if i == rootPortIndex {
+				sw.Nics[i].StpInfo.Type = PORT_STP_TYPE_ROOT
+
+				if EnableStpLogging {
+					fmt.Printf("[%s][%s:%s] ------> Port set to ROOT (RootSwitchId=%s, RootPathCost=%d)\n",
+						time.Now().UTC().Format(time.RFC3339Nano), sw.Name, sw.Nics[i].ID,
+						sw.Nics[i].StpInfo.RootSwitchId, sw.Nics[i].StpInfo.RootPathCost)
+				}
+			} else {
+				// decide if designated
+				if localRootPathCost < sw.Nics[i].StpInfo.OtherSwitchRootPathCost {
+					sw.Nics[i].StpInfo.Type = PORT_STP_TYPE_DESIGNATED
+				} else if localRootPathCost == sw.Nics[i].StpInfo.OtherSwitchRootPathCost && sw.StpInfo.ID < sw.Nics[i].StpInfo.OtherSwitchId {
+					sw.Nics[i].StpInfo.Type = PORT_STP_TYPE_DESIGNATED
+				} else {
+					sw.Nics[i].StpInfo.Type = PORT_STP_TYPE_BLOCKING
+				}
+
+				if EnableStpLogging {
+					fmt.Printf("[%s][%s:%s] ------> Port set to %s (LocalRootPathCost=%d, OtherSwitchRootPathCost=%d, LocalSwitchId=%s, OtherSwitchId=%s)\n",
+						time.Now().UTC().Format(time.RFC3339Nano), sw.Name, sw.Nics[i].ID, sw.Nics[i].StpInfo.getPortRole(),
+						localRootPathCost, sw.Nics[i].StpInfo.OtherSwitchRootPathCost,
+						sw.StpInfo.ID, sw.Nics[i].StpInfo.OtherSwitchId)
+				}
+			}
+		}
+	}
 }

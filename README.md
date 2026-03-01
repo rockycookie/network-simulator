@@ -16,6 +16,8 @@ Golang code to simulate networking devices which compose a network
         - Broadcast for Ethernet frames whose destination MAC does not exist in the MAC address table
         - STP support
             - multi-switches root election
+            - loop-free function by blocking certain switch port(s)
+            - port-fast to ensure enpoint host connection to the switches
     - Host Ethernet features
         - Send and reply L2 frames using its unique NIC
             - Discard frames if their destination MAC does not match the host's NIC
@@ -29,3 +31,4 @@ Golang code to simulate networking devices which compose a network
 
 - [Host-Switch-Host Communication](./docs/setup/host-to-host-via-switch.md)
 - [4 Switches STP Root Election](./docs/setup/4-switches-stp-root-election.md)
+- [Host-LoopedSwitches-Host Communication](./docs/setup/host-to-host-via-4-looped-switches.md)

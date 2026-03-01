@@ -42,22 +42,25 @@ func (h *Host) Run() {
 }
 
 func (h *Host) SendFrame(frame L2Frame) {
+	fmt.Printf("[%s][%s] Sending frame (SrcMac=%s, DstMac=%s, Name=%s, NeedReply=%t)\n",
+		time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, frame.Name, frame.NeedReply)
+
 	h.Nic.SendFrame(frame)
 }
 
 func (h *Host) receiveFrame(frame L2Frame) {
 	if frame.DstMac != h.Nic.Mac {
 		if EnableMacLogging {
-			fmt.Printf("[%s][Host %s] Frame (SrcMac=%s, DstMac=%s) not for this host (DstMac=%s); ignoring.\n",
-				time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, h.Nic.Mac)
+			fmt.Printf("[%s][%s] Received frame (SrcMac=%s, DstMac=%s, Name=%s, NeedReply=%t) not for this host (DstMac=%s); ignoring.\n",
+				time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, frame.Name, frame.NeedReply, h.Nic.Mac)
 		}
 		return
 	}
 
+	fmt.Printf("[%s][%s] Received frame (SrcMac=%s, DstMac=%s, Name=%s, NeedReply=%t)\n",
+		time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, frame.Name, frame.NeedReply)
 	// If the frame needs a reply, send a reply frame back
 	if frame.NeedReply {
-		fmt.Printf("[%s][Host %s] Frame (SrcMac=%s, DstMac=%s) requests reply; sending reply frame.\n",
-			time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac)
 
 		replyFrame := L2Frame{
 			SrcMac:    h.Nic.Mac,
@@ -66,9 +69,6 @@ func (h *Host) receiveFrame(frame L2Frame) {
 			NeedReply: false,
 		}
 		h.SendFrame(replyFrame)
-	} else {
-		fmt.Printf("[%s][Host %s] Received no-reply-required frame (SrcMac=%s, DstMac=%s): %s\n",
-			time.Now().UTC().Format(time.RFC3339Nano), h.Name, frame.SrcMac, frame.DstMac, frame.Name)
 	}
 }
 
