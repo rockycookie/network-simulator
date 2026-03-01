@@ -1,12 +1,20 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"network-simulator/lib"
 	"time"
 )
 
 func main() {
+	// Define and parse command-line flags
+	loggingScope := flag.String("log", "none", "Logging scope: mac, stp, all, or none")
+	flag.Parse()
+
+	// Set the logging scope
+	lib.SetLoggingScope(*loggingScope)
+
 	fmt.Printf("\n===============================================\n")
 	fmt.Printf("   STP ROOT ELECTION DEMONSTRATION\n")
 	fmt.Printf("===============================================\n\n")
@@ -107,6 +115,7 @@ func main() {
 	sw1.Stop()
 	sw2.Stop()
 	sw3.Stop()
+	sw4.Stop()
 	cableSW1SW2.Stop()
 	cableSW2SW3.Stop()
 	cableSW1SW3.Stop()
@@ -120,6 +129,7 @@ func printSwitchStpInfo(sw *lib.Switch) {
 	fmt.Printf("Switch: %s\n", sw.Name)
 	fmt.Printf("  Bridge ID: %s\n", sw.StpInfo.ID)
 	fmt.Printf("  Root Bridge ID: %s\n", sw.StpInfo.RootBridgeId)
+	fmt.Printf("  Root Path Cost: %d\n", sw.StpInfo.RootPathCost)
 	fmt.Printf("  STP State: %d\n", sw.StpInfo.State)
 	fmt.Printf("  Ports:\n")
 	for i := range sw.Nics {

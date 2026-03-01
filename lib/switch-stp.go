@@ -56,7 +56,6 @@ func (sw *Switch) initStp() {
 			sw.StpInfo.ID = sw.Nics[i].Mac
 		}
 	}
-	fmt.Printf("[Switch %s] Initialized STP with Bridge ID: %s\n", sw.Name, sw.StpInfo.ID)
 
 	// Initialize each port's STP info
 	for i := range sw.Nics {
@@ -88,8 +87,9 @@ func (sw *Switch) RunStp() {
 		// Wait for ForwardDelaySeconds before transitioning ports to forwarding state
 		time.Sleep(time.Duration(sw.StpInfo.ForwardDelaySeconds) * time.Second)
 
-		// check all ports and either forward or block based on STP logic
-		// sw.determinePortRolesAndStates()
+		// Finished root election
+		//TODO: continue more later
+		sw.StpInfo.State = SW_STP_STATE_BROKEN // temporary state to indicate STP is done
 	}()
 }
 
@@ -113,6 +113,12 @@ func (nic *Nic) sendConfigBpdu(helloTimeSeconds uint16) {
 			nic.ConnectedCable.TransmitFrame(nic, bpdu)
 		}
 
+		if EnableStpLogging {
+			fmt.Printf("[%s][Switch %s] Sending BPDU on NIC %s: RootBridgeId=%s, RootPathCost=%d\n",
+				time.Now().UTC().Format(time.RFC3339Nano), nic.Switch.Name, nic.ID,
+				nic.Switch.StpInfo.RootBridgeId, nic.Switch.StpInfo.RootPathCost)
+		}
+
 		// Sleep for the hello interval
 		time.Sleep(time.Duration(helloTimeSeconds) * time.Second)
 	}
@@ -127,9 +133,11 @@ func (sw *Switch) ProcessConfigBpdu(inboundBPDU *ConfigBpdu, inboundNic *Nic) {
 			inboundCost := inboundBPDU.RootPathCost + inboundNic.StpInfo.LinkCost
 			inboundRootId := inboundBPDU.RootBridgeId
 
-			fmt.Printf("[%s][Switch %s] Received better BPDU on NIC %s: RootBridgeId=%s, RootPathCost=%d (was RootBridgeId=%s, RootPathCost=%d)\n",
-				time.Now().UTC().Format(time.RFC3339Nano), sw.Name, inboundNic.ID,
-				inboundRootId, inboundCost, inboundNic.StpInfo.RootBridgeId, inboundNic.StpInfo.RootPathCost)
+			if EnableStpLogging {
+				fmt.Printf("[%s][Switch %s] Received better BPDU on NIC %s: RootBridgeId=%s, RootPathCost=%d (was RootBridgeId=%s, RootPathCost=%d)\n",
+					time.Now().UTC().Format(time.RFC3339Nano), sw.Name, inboundNic.ID,
+					inboundRootId, inboundCost, inboundNic.StpInfo.RootBridgeId, inboundNic.StpInfo.RootPathCost)
+			}
 
 			// write the better root info to the inbound port's STP info
 			inboundNic.swLock()

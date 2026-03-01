@@ -61,21 +61,22 @@ func (s *Switch) Run() {
 }
 
 func (s *Switch) ReceiveFrame(frame L2Frame, inboundNic *Nic) {
-	// fmt.Printf("[%s][Switch %s] Switch received frame: SrcMac=%s, DstMac=%s, on NIC=%s\n", time.Now().UTC().Format(time.RFC3339Nano), s.Name, frame.SrcMac, frame.DstMac, inboundNic.ID)
+	if EnableMacLogging {
+		fmt.Printf("[%s][Switch %s] Switch received frame: SrcMac=%s, DstMac=%s, on NIC=%s\n", time.Now().UTC().Format(time.RFC3339Nano), s.Name, frame.SrcMac, frame.DstMac, inboundNic.ID)
+	}
 
 	// Handle ConfigBpdu frames for STP
 	if frame.DstMac == STP_BPDU_DEST_MAC {
-		fmt.Printf("[%s][Switch %s] Processing BPDU from %s: RootBridgeId=%s, RootPathCost=%d\n",
-			time.Now().UTC().Format(time.RFC3339Nano), s.Name, inboundNic.ID,
-			frame.ConfigBpdu.RootBridgeId, frame.ConfigBpdu.RootPathCost)
 		s.ProcessConfigBpdu(frame.ConfigBpdu, inboundNic)
 		return
 	}
 
 	// Only process data frames on ports in FORWARDING or LEARNING state
 	if inboundNic.Switch.StpInfo.State != SW_STP_STATE_FORWARDING && inboundNic.Switch.StpInfo.State != SW_STP_STATE_LEARNING {
-		fmt.Printf("[%s][Switch %s] is in state %d (not forwarding/learning), dropping frame\n",
-			time.Now().UTC().Format(time.RFC3339Nano), s.Name, inboundNic.Switch.StpInfo.State)
+		if EnableStpLogging {
+			fmt.Printf("[%s][Switch %s] is in state %d (not forwarding/learning), dropping frame\n",
+				time.Now().UTC().Format(time.RFC3339Nano), s.Name, inboundNic.Switch.StpInfo.State)
+		}
 		return
 	}
 
@@ -93,7 +94,9 @@ func (s *Switch) ReceiveFrame(frame L2Frame, inboundNic *Nic) {
 	if found {
 		s.SendFrame(frame, outboundNic)
 	} else {
-		fmt.Printf("[%s][Switch %s] Switch does not know destination MAC %s; broadcasting frame\n", time.Now().UTC().Format(time.RFC3339Nano), s.Name, frame.DstMac)
+		if EnableMacLogging {
+			fmt.Printf("[%s][Switch %s] Switch does not know destination MAC %s; broadcasting frame\n", time.Now().UTC().Format(time.RFC3339Nano), s.Name, frame.DstMac)
+		}
 		s.broadcastFrame(frame, inboundNic)
 	}
 }
@@ -121,9 +124,11 @@ func (s *Switch) SendFrame(frame L2Frame, switchNic *Nic) {
 	// Allow BPDU frames to be sent regardless of port state
 	if frame.ConfigBpdu != nil {
 		if switchNic.ConnectedCable != nil {
-			fmt.Printf("[%s][Switch %s] Switch sending BPDU via NIC=%s (RootBridgeId=%s, RootPathCost=%d)\n",
-				time.Now().UTC().Format(time.RFC3339Nano), s.Name, switchNic.ID,
-				frame.ConfigBpdu.RootBridgeId, frame.ConfigBpdu.RootPathCost)
+			if EnableStpLogging {
+				fmt.Printf("[%s][Switch %s] Switch sending BPDU via NIC=%s (RootBridgeId=%s, RootPathCost=%d)\n",
+					time.Now().UTC().Format(time.RFC3339Nano), s.Name, switchNic.ID,
+					frame.ConfigBpdu.RootBridgeId, frame.ConfigBpdu.RootPathCost)
+			}
 			switchNic.ConnectedCable.TransmitFrame(switchNic, frame)
 		}
 		return
@@ -131,13 +136,17 @@ func (s *Switch) SendFrame(frame L2Frame, switchNic *Nic) {
 
 	// Only forward data frames through ports in FORWARDING state
 	if switchNic.Switch.StpInfo.State != SW_STP_STATE_FORWARDING {
-		fmt.Printf("[%s][Switch %s] is in state %d (not forwarding), dropping frame\n",
-			time.Now().UTC().Format(time.RFC3339Nano), s.Name, switchNic.Switch.StpInfo.State)
+		if EnableStpLogging {
+			fmt.Printf("[%s][Switch %s] is in state %d (not forwarding), dropping frame\n",
+				time.Now().UTC().Format(time.RFC3339Nano), s.Name, switchNic.Switch.StpInfo.State)
+		}
 		return
 	}
 
 	if switchNic.ConnectedCable != nil {
-		fmt.Printf("[%s][Switch %s] Switch sending frame: SrcMac=%s, DstMac=%s, via NIC=%s\n", time.Now().UTC().Format(time.RFC3339Nano), s.Name, frame.SrcMac, frame.DstMac, switchNic.ID)
+		if EnableMacLogging {
+			fmt.Printf("[%s][Switch %s] Switch sending frame: SrcMac=%s, DstMac=%s, via NIC=%s\n", time.Now().UTC().Format(time.RFC3339Nano), s.Name, frame.SrcMac, frame.DstMac, switchNic.ID)
+		}
 		switchNic.ConnectedCable.TransmitFrame(switchNic, frame)
 	}
 }
