@@ -18,6 +18,7 @@ type PortStp struct {
 	RootPathCost            uint32
 	OtherSwitchId           string
 	OtherSwitchRootPathCost uint32
+	PortFast                bool
 	mu                      sync.Mutex
 }
 
@@ -44,4 +45,8 @@ func (p *PortStp) getPortRole() string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+func (n *Nic) shouldStpDrop(f *L2Frame) bool {
+	return !n.StpInfo.PortFast && f.DstMac != STP_BPDU_DEST_MAC && n.StpInfo.Type == PORT_STP_TYPE_BLOCKING
 }

@@ -63,7 +63,7 @@ func (c *Cable) deliverFrame(event cableFrameEvent) {
 	}
 
 	if EnableMacLogging {
-		fmt.Printf("Cable transmitting frame: SrcMac=%s, DstMac=%s, from NIC=%s, to NIC=%s with 100ms delay\n", event.frame.SrcMac, event.frame.DstMac, event.fromNic.ID, toNic.ID)
+		fmt.Printf("[%s][%s] Cable transmitting frame: SrcMac=%s, DstMac=%s with 100ms delay\n", time.Now().UTC().Format(time.RFC3339Nano), c.String(), event.frame.SrcMac, event.frame.DstMac)
 	}
 	time.Sleep(100 * time.Millisecond)
 	toNic.EnqueueFrame(event.frame)
@@ -72,4 +72,8 @@ func (c *Cable) deliverFrame(event cableFrameEvent) {
 // Stop signals the Cable goroutine to exit
 func (c *Cable) Stop() {
 	close(c.quitChan)
+}
+
+func (c *Cable) String() string {
+	return fmt.Sprintf("Cable(%s <-> %s)", c.Nics[0].ID, c.Nics[1].ID)
 }
